@@ -54,7 +54,9 @@
 		showPrevNext: true,
 		allowOld: true,
 		showAlways: false,
-		position: "absolute"
+		position: "absolute",
+		zIndex: 9999,
+		monthNames: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 	};
 
 	var methods =
@@ -109,10 +111,10 @@
 				var s = $(this).data("settings");
 
 				// Hide if not showing always
-				if(!s.showAlways)
+				if(s && !s.showAlways)
 				{
 					// Hide the calendar and remove class from target
-					$("#"+s.calId).slideUp(200);
+					$("#"+s.calId).hide();
 					$(this).removeClass("_gldp");
 				}
 			}
@@ -218,12 +220,12 @@
 					var n = p - prevDateLastDay;
 					var c = (x == 0) ? "sun" : ((x == 6) ? "sat" : "day");
 
+					var today = new Date(); today.setHours(0,0,0,0);
+					var date = new Date(theDate); date.setHours(0,0,0,0); date.setDate(n);
+					var dateTime = date.getTime();
 					// If value is outside of bounds its likely previous and next months
 					if(n >= 1 && n <= lastDay)
 					{
-						var today = new Date(); today.setHours(0,0,0,0);
-						var date = new Date(theDate); date.setHours(0,0,0,0); date.setDate(n);
-						var dateTime = date.getTime();
 
 						// Test to see if it's today
 						c = (today.getTime() == dateTime) ? "today":c;
@@ -248,7 +250,21 @@
 					}
 					else
 					{
-						c = "noday"; // Prev/Next month dates are non-selectable by default
+						// c = "noday"; // Prev/Next month dates are non-selectable by default
+						if(n > lastDay)
+						{
+							c = "nextmonth";
+						}
+						if(n < 1)
+						{
+							c = "prevmonth";
+						}
+						
+						if(!settings.allowOld)
+						{
+							c = (dateTime < startTime) ? "noday":c;
+						}
+						
 						n = (n <= 0) ? p : ((p - lastDay) - prevDateLastDay);
 					}
 
@@ -292,19 +308,21 @@
 				target.after
 				(
 					$("<div id='"+calId+"'></div>")
-					.css(
-					{
-						"position":settings.position,
-						"z-index":settings.zIndex,
-						"left":(target.offset().left),
-						"top":target.offset().top+target.outerHeight(true)
-					})
 				);
 			}
+			
+			// style calendar
+			$("#"+calId).css(
+				{
+					"position":settings.position,
+					"z-index":settings.zIndex,
+					"left":(target.position().left),
+					"top":target.position().top+target.outerHeight(true)
+				});
 
 			// Show calendar
 			var calendar = $("#"+calId);
-			calendar.html(html).slideDown(200);
+			calendar.html(html).show();
 
 			// Add a class to make it easier to find when hiding
 			target.addClass("_gldp");
@@ -347,17 +365,28 @@
 					e.stopPropagation();
 					var day = $(this).children("div").html();
 					var settings = target.data("settings");
-					var newDate = new Date(theDate); newDate.setDate(day);
-
+					var newDate = new Date(theDate); 
+					newDate.setDate(day);
+					
+					if ($(this).closest("tr.days").index() > 3 && day < 10) {
+						newDate.setMonth(newDate.getMonth()+1);
+					}
+					else if ($(this).closest("tr.days").index() <= 2 && day > 20) {
+						newDate.setMonth(newDate.getMonth()-1);
+					}
+					
 					// Save the new date and update the target control
 					target.data("theDate", newDate);
-					target.val((newDate.getMonth()+1)+"/"+newDate.getDate()+"/"+newDate.getFullYear());
+					target.val(settings.monthNames[newDate.getMonth()]+" "+newDate.getDate()+" "+newDate.getFullYear());
 
 					// Run callback to user-defined date change method
 					if(settings.onChange != null && typeof settings.onChange != "undefined")
 					{
 						settings.onChange(target, newDate);
 					}
+					
+					// trigger a change event
+					target.trigger('change');
 
 					// Save selected
 					settings.selectedDate = newDate;
